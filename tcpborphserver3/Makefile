@@ -12,7 +12,7 @@ CFLAGS += -ggdb
 #CFLAGS += -DFAILFAST
 
 SERVER = tcpborphserver3
-SRC = main.c raw.c loadbof.c tg.c tapper.c hwmon.c upload.c subprocess.c ev.c
+SRC = main.c raw.c loadbof.c tg.c tapper.c hwmon.c upload.c subprocess.c ev.c plugin.c
 
 OBJ = $(patsubst %.c,%.o,$(SRC))
 all: $(SERVER)
