@@ -1,9 +1,6 @@
 #ifndef PLUGIN_H_
 #define PLUGIN_H_
 
-int N_LOADED_PLUGINS = 0;
-void **LOADED_PLUGINS = NULL;
-
 /* Plugin command struct */
 struct  PLUGIN_CMD {
   char *name;

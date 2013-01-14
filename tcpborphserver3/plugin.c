@@ -14,6 +14,10 @@
 #include "plugin.h"
 
 
+int N_LOADED_PLUGINS = 0;
+void **LOADED_PLUGINS = NULL;
+
+
 int list_plugin_cmd(struct katcp_dispatch *d, int argc)
 {
   int i;
