@@ -1682,7 +1682,9 @@ int setup_raw_tbs(struct katcp_dispatch *d, char *bofdir, int argc, char **argv)
   result += register_flag_mode_katcp(d, "?chassis-start",  "initialise chassis interface", &start_chassis_cmd, 0, TBS_MODE_RAW);
   result += register_flag_mode_katcp(d, "?chassis-led",    "set a chassis led (?chassis-led led state)", &led_chassis_cmd, 0, TBS_MODE_RAW);
 
-  result += register_flag_mode_katcp(d, "?load-plugin",    "load shared objects from plugin (?load-plugin plugin)", &load_plugin_cmd, 0, TBS_MODE_RAW);
+  result += register_flag_mode_katcp(d, "?plugin-list",    "list all currently loaded plugins (?plugin-list)", &list_plugin_cmd, 0, TBS_MODE_RAW);
+  result += register_flag_mode_katcp(d, "?plugin-load",    "load shared objects from plugin (?plugin-load plugin)", &load_plugin_cmd, 0, TBS_MODE_RAW);
+  result += register_flag_mode_katcp(d, "?plugin-unload",    "load shared objects from plugin (?plugin-unload plugin)", &unload_plugin_cmd, 0, TBS_MODE_RAW);
 
   tr->r_chassis = chassis_init_tbs(d, TBS_ROACH_CHASSIS);
   if(tr->r_chassis){
