@@ -4,7 +4,7 @@ include ../Makefile.inc
 
 INC = -I$(KATCP)
 #LIB = -L$(KATCP) -lkatcp -ldl -lz -lmagic
-LIB = -L$(KATCP) -lkatcp -ldl -lz
+LIB = -L$(KATCP) -lkatcp -ldl -lz -rdynamic
 CFLAGS += -fPIC
 CFLAGS += -ggdb
 #CFLAGS += -DDEBUG
