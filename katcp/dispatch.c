@@ -1692,6 +1692,13 @@ unsigned long arg_unsigned_long_katcp(struct katcp_dispatch *d, unsigned int ind
   return arg_unsigned_long_katcl(d->d_line, index);
 }
 
+signed long arg_signed_long_katcp(struct katcp_dispatch *d, unsigned int index)
+{
+  sane_katcp(d);
+
+  return arg_signed_long_katcl(d->d_line, index);
+}
+
 int arg_byte_bit_katcp(struct katcp_dispatch *d, unsigned int index, struct katcl_byte_bit *b)
 {
   sane_katcp(d);
