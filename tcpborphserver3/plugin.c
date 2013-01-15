@@ -244,9 +244,10 @@ int unload_plugin_cmd(struct katcp_dispatch *d, int argc)
 
   /* Remove module from plugins list */
   for (k=0; k<N_LOADED_PLUGINS; k++) {
-    temp[k] = LOADED_PLUGINS[k-past];
     if (k == i) {
       past = 1;
+    } else {
+      temp[k-past] = LOADED_PLUGINS[k];
     }
   }
   free(LOADED_PLUGINS);
