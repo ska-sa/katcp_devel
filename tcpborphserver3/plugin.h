@@ -13,6 +13,8 @@ struct PLUGIN {
   int n_cmds;
   char *name;
   char *version;
+  int (* init)(struct katcp_dispatch *d, int argc);
+  int (* uninit)(struct katcp_dispatch *d, int argc);
   struct PLUGIN_CMD cmd_array[];
 };
 

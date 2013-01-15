@@ -62,6 +62,8 @@ int load_plugin_cmd(struct katcp_dispatch *d, int argc)
   struct PLUGIN *plugin_info;
   struct PLUGIN_CMD *plugin_cmds;
 
+  int (* plugin_init)(struct katcp_dispatch *d, int argc);
+
   /* Get the filename of the plugin to load */
   name = arg_string_katcp(d, 1);
   if(name == NULL){
@@ -101,20 +103,29 @@ int load_plugin_cmd(struct katcp_dispatch *d, int argc)
     return KATCP_RESULT_FAIL;
   }
 
+  /* Get the init if available */
+  plugin_init = plugin_info->init;
+  if (plugin_init == NULL) {
+    log_message_katcp(d, KATCP_LEVEL_INFO, NULL, "no plugin init function found");
+  } else {
+    /* Call init before loading commands */
+    if (plugin_init(d, argc) != 0) {
+      log_message_katcp(d, KATCP_LEVEL_ERROR, NULL, "problem while initializing");
+      dlclose(module); /* make sure to close on failure */
+      return KATCP_RESULT_FAIL;
+    }
+  }
+
   /* Get total commands available */
   n_cmds = plugin_info->n_cmds;
-  if (!n_cmds) {
-    log_message_katcp(d, KATCP_LEVEL_ERROR, NULL, "plugin says no commands available");
-    dlclose(module); /* make sure to close on failure */
-    return KATCP_RESULT_FAIL;
+  if (n_cmds == 0) {
+    log_message_katcp(d, KATCP_LEVEL_INFO, NULL, "plugin says no commands available");
   }
 
   /* Get array of functions */
   plugin_cmds = plugin_info->cmd_array;
   if (plugin_cmds == NULL) {
     log_message_katcp(d, KATCP_LEVEL_ERROR, NULL, "no commands found");
-    dlclose(module); /* make sure to close on failure */
-    return KATCP_RESULT_FAIL;
   }
 
   /* Load commands into tcpborphserver */
@@ -161,6 +172,8 @@ int unload_plugin_cmd(struct katcp_dispatch *d, int argc)
   struct PLUGIN *plugin_info;
   struct PLUGIN_CMD *plugin_cmds;
 
+  int (* plugin_uninit)(struct katcp_dispatch *d, int argc);
+
   /* Check if we haven't loaded any plugins */
   if (LOADED_PLUGINS == NULL) {
     log_message_katcp(d, KATCP_LEVEL_ERROR, NULL, "no plugins have been loaded");
@@ -193,6 +206,18 @@ int unload_plugin_cmd(struct katcp_dispatch *d, int argc)
   if (!found) {
     log_message_katcp(d, KATCP_LEVEL_ERROR, NULL, "plugin not found. cannot unload");
     return KATCP_RESULT_FAIL;
+  }
+
+  /* Get the uninit if available */
+  plugin_uninit = plugin_info->uninit;
+  if (plugin_uninit == NULL) {
+    log_message_katcp(d, KATCP_LEVEL_ERROR, NULL, "no plugin uninit function found");
+  } else {
+    /* Call uninit before closing */
+    if (plugin_uninit(d, argc) != 0) {
+      log_message_katcp(d, KATCP_LEVEL_ERROR, NULL, "problem while uninitializing");
+      return KATCP_RESULT_FAIL;
+    }
   }
 
   /* Now deregister the katcp commands */
