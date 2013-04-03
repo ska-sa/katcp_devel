@@ -12,17 +12,20 @@ CFLAGS += -DDEBUG
 #CFLAGS += -DFAILFAST
 
 SERVER = tcpborphserver3
+SERVER_GITVER = $(SERVER)-$(GITVER)
 SRC = main.c raw.c loadbof.c tg.c tapper.c hwmon.c upload.c subprocess.c ev.c
 
 OBJ = $(patsubst %.c,%.o,$(SRC))
-all: $(SERVER)
+all: $(SERVER_GITVER)
 
-#$(SERVER): $(OBJ) 
-$(SERVER): $(OBJ) $(KATCP)/libkatcp.a
+$(SERVER): $(SERVER_GITVER)
+	cp $< $@
+
+$(SERVER_GITVER): $(OBJ) $(KATCP)/libkatcp.a
 	$(CC) -o $@ $(OBJ) $(LIB)
 
 clean: 
-	$(RM) -f $(SERVER) *.o test-*
+	$(RM) -f ./$(SERVER) ./$(SERVER)-* *.o test-*
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@ $(INC)
