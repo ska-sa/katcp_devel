@@ -36,6 +36,10 @@ $(SHARED): $(OBJ)
 %.o: %.c $(wildcard *.h)
 	$(CC) $(CFLAGS) -c $< -o $@ $(INC)
 
+show:
+	@echo 'VERSION="$(VERSION)"'
+	@echo 'BUILD="$(BUILD)"'
+
 clean:
 	$(RM) $(LIB) $(SHARED) *.o core
 
