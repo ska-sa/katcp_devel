@@ -354,9 +354,9 @@ int add_code_version_katcp(struct katcp_dispatch *d)
 
 #ifdef VERSION
 #ifdef BUILD
-  result += add_version_katcp(d, KATCP_LIBRARY_LABEL, 0, VERSION, BUILD);
+  result += add_version_katcp(d, KATCP_LIBRARY_LABEL, 0, STRINGIFY(VERSION), STRINGIFY(BUILD));
 #else
-  result += add_version_katcp(d, KATCP_LIBRARY_LABEL, 0, VERSION, NULL);
+  result += add_version_katcp(d, KATCP_LIBRARY_LABEL, 0, STRINGIFY(VERSION), NULL);
 #endif
 #endif
 

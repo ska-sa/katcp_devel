@@ -4,7 +4,7 @@ include ../Makefile.inc
 
 VERSION = 0.1
 
-BUILD = $(shell date +%Y-%m-%dT%H:%M:%S)
+BUILD = $(shell date -u '+%Y-%m-%dT%H:%M:%S %Z')
 VERSION = $(GITVER)
 
 INC = -I.
@@ -14,8 +14,8 @@ SHARED = libkatcp.so
 #CFLAGS := $(filter-out -DDEBUG,$(CFLAGS))
 
 CFLAGS += -fPIC 
-CFLAGS += -DVERSION=\"$(VERSION)\"
-CFLAGS += -DBUILD=\"$(BUILD)\"
+CFLAGS += -DVERSION="$(VERSION)"
+CFLAGS += -DBUILD="$(BUILD)"
 
 SUB = examples utils
 SRC = line.c netc.c dispatch.c loop.c log.c time.c shared.c misc.c server.c client.c ts.c nonsense.c notice.c job.c parse.c rpc.c queue.c map.c kurl.c version.c fork-parent.c avltree.c ktype.c stack.c services.c dbase.c arb.c dpx.c spointer.c event.c bytebit.c
@@ -35,6 +35,10 @@ $(SHARED): $(OBJ)
 
 %.o: %.c $(wildcard *.h)
 	$(CC) $(CFLAGS) -c $< -o $@ $(INC)
+
+show:
+	@echo 'VERSION="$(VERSION)"'
+	@echo 'BUILD="$(BUILD)"'
 
 clean:
 	$(RM) $(LIB) $(SHARED) *.o core

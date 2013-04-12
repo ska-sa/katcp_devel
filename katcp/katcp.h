@@ -113,6 +113,13 @@ struct katcp_url;
 #define KATCP_CLIENT_CONNECT           "#client-connected"
 #define KATCP_CLIENT_DISCONNECT        "#client-disconnected"
 
+/* Used to stringify the VERSION and BUILD macros.
+ * See "info cpp stringification" for details on
+ * why this needs to be a two stage process.
+ */
+#define STRINGIFY1(s) #s
+#define STRINGIFY(s) STRINGIFY1(s)
+
 /******************* core api ********************/
 
 /* create a dispatch handler */
@@ -525,7 +532,7 @@ int add_kernel_version_katcp(struct katcp_dispatch *d);
 int add_code_version_katcp(struct katcp_dispatch *d);
 
 #ifdef VERSION
-#define check_code_version_katcp(d) has_code_version_katcp(d, KATCP_LIBRARY_LABEL, VERSION)
+#define check_code_version_katcp(d) has_code_version_katcp(d, KATCP_LIBRARY_LABEL, STRINGIFY(VERSION))
 #endif
 int has_code_version_katcp(struct katcp_dispatch *d, char *label, char *value);
 
