@@ -16,7 +16,7 @@ SERVER_GITVER = $(SERVER)-$(GITVER)
 SRC = main.c raw.c loadbof.c tg.c tapper.c hwmon.c upload.c subprocess.c ev.c plugin.c
 
 OBJ = $(patsubst %.c,%.o,$(SRC))
-all: $(SERVER_GITVER)
+all: $(SERVER) $(SERVER_GITVER)
 
 $(SERVER): $(SERVER_GITVER)
 	cp $< $@
