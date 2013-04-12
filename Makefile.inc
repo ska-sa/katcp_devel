@@ -6,7 +6,7 @@ KATCP ?= katcp
 
 # compiler flags, -Wall is just the right thing to do 
 CFLAGS += -Wall
-#CFLAGS += -O2
+CFLAGS += -O2
 
 # where the C implementation has diverged from the katcp standard,
 # force standard behaviour. Currently only one case: log-level affects
@@ -29,6 +29,9 @@ CFLAGS += -DKATCP_CONSISTENCY_CHECKS
 
 # log selected noncritical failures to stderr 
 CFLAGS += -DKATCP_STDERR_ERRORS
+
+# log client messages 
+CFLAGS += -DKATCP_LOG_REQUESTS
 
 # enable the ability to manage katcp subprocesses
 CFLAGS += -DKATCP_SUBPROCESS

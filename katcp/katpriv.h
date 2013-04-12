@@ -22,6 +22,11 @@
 #define KATCL_PARSE_FAKE       6  /* generated manually, not parsed */
 #define KATCL_PARSE_DONE       7  /* a complete message */
 
+
+#define KATCL_ALIGN_NONE       0x0
+#define KATCL_ALIGN_BYTE       0x1
+#define KATCL_ALIGN_WORD       0x2  /* 32 bits */
+
 /***************************************************************************/
 
 struct katcl_byte_bit;
@@ -410,6 +415,8 @@ struct katcp_arb{
   void *a_data;
 };
 
+#define KATCP_FLAT_STACK 4
+
 struct katcp_shared{
   unsigned int s_magic;
   struct katcp_entry *s_vector;
@@ -459,8 +466,11 @@ struct katcp_shared{
 
   struct katcp_group **s_groups;
   struct katcp_group *s_fallback;
-  struct katcp_flat *s_this;
   unsigned int s_members;
+
+  struct katcp_flat **s_this;
+  int s_level;
+  unsigned int s_stories;
 
 #if 0
   int s_version_major;
@@ -644,6 +654,9 @@ int ended_jobs_katcp(struct katcp_dispatch *d);
 int run_flat_katcp(struct katcp_dispatch *d);
 int load_flat_katcp(struct katcp_dispatch *d);
 
+int init_flats_katcp(struct katcp_dispatch *d, unsigned int stories);
+void destroy_flats_katcp(struct katcp_dispatch *d);
+
 /* parse: setup */
 struct katcl_parse *create_parse_katcl();
 struct katcl_parse *create_referenced_parse_katcl();
@@ -666,6 +679,8 @@ int add_double_parse_katcl(struct katcl_parse *p, int flags, double v);
 int add_buffer_parse_katcl(struct katcl_parse *p, int flags, void *buffer, unsigned int len);
 int add_parameter_parse_katcl(struct katcl_parse *pd, int flags, struct katcl_parse *ps, unsigned int index);
 
+int buffer_from_parse_katcl(struct katcl_parse *p, char *buffer, unsigned int len);
+
 /* parse: extracting, testing fields */
 unsigned int get_count_parse_katcl(struct katcl_parse *p);
 int get_tag_parse_katcl(struct katcl_parse *p);
@@ -680,7 +695,7 @@ char *get_string_parse_katcl(struct katcl_parse *p, unsigned int index);
 char *copy_string_parse_katcl(struct katcl_parse *p, unsigned int index);
 unsigned long get_unsigned_long_parse_katcl(struct katcl_parse *p, unsigned int index);
 long get_signed_long_parse_katcl(struct katcl_parse *p, unsigned int index);
-int get_byte_bit_parse_katcl(struct katcl_parse *p, unsigned int index, struct katcl_byte_bit *b);
+int get_bb_parse_katcl(struct katcl_parse *p, unsigned int index, struct katcl_byte_bit *b);
 #ifdef KATCP_USE_FLOATS
 double get_double_parse_katcl(struct katcl_parse *p, unsigned int index);
 #endif

@@ -187,7 +187,9 @@ int run_pipe_server_katcp(struct katcp_dispatch *dl, char *file, int pfd);
 int fileno_katcp(struct katcp_dispatch *d);
 struct katcl_line *line_katcp(struct katcp_dispatch *d);
 int read_katcp(struct katcp_dispatch *d);
+#if 0 /* deprecated */
 int have_katcp(struct katcp_dispatch *d);
+#endif
 int flushing_katcp(struct katcp_dispatch *d);
 int flush_katcp(struct katcp_dispatch *d);
 int write_katcp(struct katcp_dispatch *d);
@@ -209,7 +211,7 @@ char *arg_copy_string_katcp(struct katcp_dispatch *d, unsigned int index);
 unsigned long arg_unsigned_long_katcp(struct katcp_dispatch *d, unsigned int index);
 signed long arg_signed_long_katcp(struct katcp_dispatch *d, unsigned int index);
 unsigned int arg_buffer_katcp(struct katcp_dispatch *d, unsigned int index, void *buffer, unsigned int size);
-int arg_byte_bit_katcp(struct katcp_dispatch *d, unsigned int index, struct katcl_byte_bit *b);
+int arg_bb_katcp(struct katcp_dispatch *d, unsigned int index, struct katcl_byte_bit *b);
 #ifdef KATCP_USE_FLOATS
 double arg_double_katcp(struct katcp_dispatch *d, unsigned int index);
 #endif

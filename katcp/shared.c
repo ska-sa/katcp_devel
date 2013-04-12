@@ -254,6 +254,13 @@ int startup_shared_katcp(struct katcp_dispatch *d)
   s->s_template = d;
   d->d_shared = s;
 
+#ifdef KATCP_EXPERIMENTAL
+  if(init_flats_katcp(d, KATCP_FLAT_STACK) < 0){
+    shutdown_shared_katcp(d);
+    return -1;
+  }
+#endif
+
   return 0;
 }
 
@@ -351,6 +358,10 @@ void shutdown_shared_katcp(struct katcp_dispatch *d)
   }
 
   /* at this point it is unsafe to call API functions on the shared structure */
+
+#ifdef KATCP_EXPERIMENTAL
+  destroy_flats_katcp(d);
+#endif
 
   free(s->s_clients);
   s->s_clients = NULL;
@@ -952,7 +963,9 @@ int mode_version_katcp(struct katcp_dispatch *d, int mode, char *subsystem, int 
 {
 #define BUFFER 20
   struct katcp_shared *s;
+#if 0
   struct katcp_entry *e;
+#endif
   char buffer[BUFFER];
 
   sane_shared_katcp(d);
@@ -962,7 +975,9 @@ int mode_version_katcp(struct katcp_dispatch *d, int mode, char *subsystem, int 
     return -1;
   }
 
+#if 0
   e = &(s->s_vector[mode]);
+#endif
 
   if(subsystem){
     snprintf(buffer, BUFFER, "%d.%d", major, minor);

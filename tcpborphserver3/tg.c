@@ -706,7 +706,7 @@ int transmit_ip_kernel(struct getap_state *gs)
       case EAGAIN :
         return 0;
       default :
-        log_message_katcp(gs->s_dispatch, KATCP_LEVEL_WARN, NULL, "write to tap device %s failed: %s", gs->s_tap_name, strerror(errno));
+        log_message_katcp(d, KATCP_LEVEL_WARN, NULL, "write to tap device %s failed: %s", gs->s_tap_name, strerror(errno));
         /* WARNING: drops packet on floor, better than spamming logs */
         forget_receive(gs);
         return -1;
@@ -714,7 +714,7 @@ int transmit_ip_kernel(struct getap_state *gs)
   }
 
   if((wr + SIZE_FRAME_HEADER) < gs->s_rx_len){
-    log_message_katcp(gs->s_dispatch, KATCP_LEVEL_WARN, NULL, "incomplete packet transmission to %s: %d + %d < %u", gs->s_tap_name, SIZE_FRAME_HEADER, wr, gs->s_rx_len);
+    log_message_katcp(d, KATCP_LEVEL_WARN, NULL, "incomplete packet transmission to %s: %d + %d < %u", gs->s_tap_name, SIZE_FRAME_HEADER, wr, gs->s_rx_len);
     /* WARNING: also ditches packet, otherwise we might have an unending stream of fragments (for some errors) */
     forget_receive(gs);
     return -1;
@@ -946,6 +946,9 @@ static int configure_tap(struct getap_state *gs)
   int len;
 
   len = snprintf(cmd_buffer, CMD_BUFFER, "ifconfig %s %s netmask 255.255.255.0 up\n", gs->s_tap_name, gs->s_address_name);
+  if((len < 0) || (len >= CMD_BUFFER)){
+    return -1;
+  }
   cmd_buffer[CMD_BUFFER - 1] = '\0';
 
   /* WARNING: stalls the system, could possibly handle it via a job command */
@@ -1070,10 +1073,9 @@ void stop_all_getap(struct katcp_dispatch *d, int final)
 struct getap_state *create_getap(struct katcp_dispatch *d, unsigned int instance, char *name, char *tap, char *ip, unsigned int port, char *mac, unsigned int period)
 {
   struct getap_state *gs; 
-  struct katcp_arb *a;
   unsigned int i;
+  struct tbs_raw *tr;
 
-  a = NULL;
   gs = NULL;
 
 #ifdef DEBUG
@@ -1081,6 +1083,17 @@ struct getap_state *create_getap(struct katcp_dispatch *d, unsigned int instance
 #endif
 
   log_message_katcp(d, KATCP_LEVEL_DEBUG, NULL, "attempting to set up tap device %s", tap);
+
+  tr = get_mode_katcp(d, TBS_MODE_RAW);
+  if(tr == NULL){
+    log_message_katcp(d, KATCP_LEVEL_ERROR, NULL, "need raw mode for tap operation");
+    return NULL;
+  }
+
+  if(tr->r_fpga != TBS_FPGA_MAPPED){
+    log_message_katcp(d, KATCP_LEVEL_ERROR, NULL, "fpga not mapped, unable to run tap logic");
+    return NULL;
+  }
 
   gs = malloc(sizeof(struct getap_state));
   if(gs == NULL){
@@ -1126,13 +1139,7 @@ struct getap_state *create_getap(struct katcp_dispatch *d, unsigned int instance
   }
 
   /* initialise the rest of the structure here */
-
-  gs->s_raw_mode = get_mode_katcp(d, TBS_MODE_RAW);
-  if(gs->s_raw_mode == NULL){
-    log_message_katcp(d, KATCP_LEVEL_ERROR, NULL, "need raw mode for tap operation");
-    destroy_getap(d, gs);
-    return NULL;
-  }
+  gs->s_raw_mode = tr;
 
   gs->s_register = find_data_avltree(gs->s_raw_mode->r_registers, name);
   if(gs->s_register == NULL){

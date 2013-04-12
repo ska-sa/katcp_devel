@@ -12,6 +12,7 @@ struct katcl_parse;
 struct katcl_byte_bit{
   unsigned long b_byte;
   unsigned char b_bit;
+  unsigned char b_align;
 };
 
 struct katcl_line *create_katcl(int fd);
@@ -34,7 +35,7 @@ char *arg_string_katcl(struct katcl_line *l, unsigned int index);
 char *arg_copy_string_katcl(struct katcl_line *l, unsigned int index);
 unsigned long arg_unsigned_long_katcl(struct katcl_line *l, unsigned int index);
 signed long arg_signed_long_katcl(struct katcl_line *l, unsigned int index);
-int arg_byte_bit_katcl(struct katcl_line *l, unsigned int index, struct katcl_byte_bit *b);
+int arg_bb_katcl(struct katcl_line *l, unsigned int index, struct katcl_byte_bit *b);
 unsigned int arg_buffer_katcl(struct katcl_line *l, unsigned int index, void *buffer, unsigned int size);
 #ifdef KATCP_USE_FLOATS
 double arg_double_katcl(struct katcl_line *l, unsigned int index);
@@ -106,5 +107,15 @@ int send_rpc_katcl(struct katcl_line *l, unsigned int timeout, ...);
 #if 0
 int finished_request_katcl(struct katcl_line *l, struct timeval *until);
 #endif
+
+/* more byte bit ops */
+
+int make_bb_katcl(struct katcl_byte_bit *bb, unsigned long byte, unsigned long bit);
+int word_normalise_bb_katcl(struct katcl_byte_bit *bb);
+int byte_normalise_bb_katcl(struct katcl_byte_bit *bb);
+
+int exceeds_bb_katcl(struct katcl_byte_bit *bb, struct katcl_byte_bit *limit);
+int add_bb_katcl(struct katcl_byte_bit *sigma, struct katcl_byte_bit *alpha, struct katcl_byte_bit *beta);
+
 
 #endif
