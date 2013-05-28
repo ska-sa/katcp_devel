@@ -72,7 +72,7 @@ int load_plugin_cmd(struct katcp_dispatch *d, int argc)
   }
 
   /* Load dynamic library */
-  module = dlopen(name, RTLD_LAZY);
+  module = dlopen(name, RTLD_NOW | RTLD_GLOBAL | RTLD_DEEPBIND);
   if (!module) {
     log_message_katcp(d, KATCP_LEVEL_ERROR, NULL, "could not open shared object: %s", dlerror());
     return KATCP_RESULT_FAIL;

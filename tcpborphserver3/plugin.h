@@ -2,7 +2,7 @@
 #define PLUGIN_H_
 
 /* Plugin command struct */
-struct  PLUGIN_CMD {
+struct PLUGIN_CMD {
   char *name;
   char *desc;
   int (* cmd)(struct katcp_dispatch *d, int argc);
