@@ -33,13 +33,16 @@
 #define SPAM_BLOCKS       16 /* drift apart in spam block quantities */
 #define ARP_MULT           2 /* multiplier to space out arp messages */
 
-#define RECEIVE_BURST      4 /* read at most N frames per polling interval */
+#define RECEIVE_BURST      8 /* read at most N frames per polling interval */
 
 #define GO_DEFAULT_PORT 7148
 
 #define GO_MAC          0x00
 #define GO_GATEWAY      0x0c
 #define GO_ADDRESS      0x10
+#define GO_MCADDR       0x30 /*mcast ip*/
+#define GO_MCMASK       0x34 /*mcast count ff.ff.ff.f7 to encode ip base +8 addresses
+                               or          ff.ff.ff.fb to encode ip base +4 addresses*/
 #define GO_BUFFER_SIZES 0x18
 #define GO_EN_RST_PORT  0x20
 
@@ -532,7 +535,7 @@ static int write_frame_fpga(struct getap_state *gs, unsigned char *data, unsigne
 
 
 #ifdef DEBUG
-  log_message_katcp(d, KATCP_LEVEL_DEBUG, NULL, "sent %u words to fpga from tap device %s\n", buffer_sizes >> 16, gs->s_tap_name);
+  log_message_katcp(d, KATCP_LEVEL_DEBUG, NULL, "sent %u words to fpga from tap device %s", buffer_sizes >> 16, gs->s_tap_name);
 #endif
 
   return 1;
@@ -550,14 +553,46 @@ static int transmit_frame_fpga(struct getap_state *gs)
   return result;
 }
 
+ /*    
+    An IP host group address is mapped to an Ethernet multicast address
+    by placing the low-order 23-bits of the IP address into the low-order
+    23 bits of the Ethernet multicast address 01-00-5E-00-00-00 (hex).
+    Because there are 28 significant bits in an IP host group address,
+    more than one host group address may map to the same Ethernet
+    multicast address.
+    i.e. take multicast address and it with 0x7FFFFF 
+  */
+
 int transmit_ip_fpga(struct getap_state *gs)
 {
+  uint8_t mcast_mac[6] = { 0x01, 0x00, 0x5E, 0x00, 0x00, 0x00 };
   uint8_t *mac;
+  uint32_t temp;
 
-  mac = gs->s_arp_table[gs->s_txb[SIZE_FRAME_HEADER + IP_DEST4]];
+  if (gs->s_txb[SIZE_FRAME_HEADER + IP_DEST1] >= 0xE0 && gs->s_txb[SIZE_FRAME_HEADER + IP_DEST1] < 0xF0){
+
+#ifdef DEBUG
+    fprintf(stderr, "txf: calculating multicast mac\n");
+#endif
+
+    temp = 0x7FFFFF & ( gs->s_txb[SIZE_FRAME_HEADER + IP_DEST1] << 24 
+                      | gs->s_txb[SIZE_FRAME_HEADER + IP_DEST2] << 16 
+                      | gs->s_txb[SIZE_FRAME_HEADER + IP_DEST3] << 8 
+                      | gs->s_txb[SIZE_FRAME_HEADER + IP_DEST4] );
+
+    mcast_mac[3] = temp & 0xFF0000;
+    mcast_mac[4] = temp & 0xFF00;
+    mcast_mac[5] = temp & 0xFF;
+
+    mac = (uint8_t *) &mcast_mac;
+  } else {
+    mac = gs->s_arp_table[gs->s_txb[SIZE_FRAME_HEADER + IP_DEST4]];
+  }
+
 #ifdef DEBUG
   fprintf(stderr, "txf: looked up dst mac: %x:%x:%x:%x:%x:%x\n", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 #endif
+  
   memcpy(gs->s_txb, mac, GETAP_MAC_SIZE);
 
   return transmit_frame_fpga(gs);
@@ -601,7 +636,7 @@ int receive_frame_fpga(struct getap_state *gs)
 #endif
 
   if((len <= SIZE_FRAME_HEADER) || (len > GETAP_MAX_FRAME)){
-    log_message_katcp(d, KATCP_LEVEL_WARN, NULL, "saw runt or oversized frame, len=%u\n bytes", len);
+    log_message_katcp(d, KATCP_LEVEL_WARN, NULL, "saw runt or oversized frame, len=%u bytes", len);
     return -1;
   }
 
@@ -794,7 +829,7 @@ int run_timer_tap(struct katcp_dispatch *d, void *data)
 
           default :
 
-            log_message_katcp(d, KATCP_LEVEL_WARN, NULL, "discarding frame of unknown type 0x%02x%02x and length %d\n", gs->s_rxb[FRAME_TYPE1], gs->s_rxb[FRAME_TYPE2], gs->s_rx_len);
+            log_message_katcp(d, KATCP_LEVEL_WARN, NULL, "discarding frame of unknown type 0x%02x%02x and length %d", gs->s_rxb[FRAME_TYPE1], gs->s_rxb[FRAME_TYPE2], gs->s_rx_len);
             forget_receive(gs);
 
             break;
@@ -818,8 +853,11 @@ int run_timer_tap(struct katcp_dispatch *d, void *data)
   fprintf(stderr, "run timer loop: burst now %d\n", burst);
 #endif
 
-  if(burst < 1){ /* only spam the network if we don't have anything better to do */
+  if(burst < (gs->s_deferrals + 1)){ /* try to spam the network if it is reasonably quiet, but adjust our definition of quiet */
     spam_arp(gs);
+    gs->s_deferrals = 0;
+  } else {
+    gs->s_deferrals++;
   }
 
   return 0;
@@ -911,22 +949,28 @@ int configure_fpga(struct getap_state *gs)
 
   *((uint32_t *)(base + GO_ADDRESS)) = value;
 
-  if(gs->s_port){
-    /* assumes plain big endian value */
-    /* Bitmask: 24   : Reset core */
-    /*          16   : Enable fabric interface */
-    /*          00-15: Port */
-    /* First, reset the core */
+  /* assumes plain big endian value */
+  /* Bitmask: 24   : Reset core */
+  /*          16   : Enable fabric interface */
+  /*          00-15: Port */
 
-    /* WARNING: the below use of the + operator doesn't look right. Jason ?  */
-
-    value = (0xff << 16) + (0xff << 16) + (gs->s_port);
-    *((uint32_t *)(base + GO_EN_RST_PORT)) = value;
-
-    /* Next, remove core from reset state: */
-    value = (0x00 << 16) + (0xff << 16) + (gs->s_port);
-    *((uint32_t *)(base + GO_EN_RST_PORT)) = value;
+  if(gs->s_port == 0){
+    value = *((uint32_t *)(base + GO_EN_RST_PORT));
+    gs->s_port = 0xffff & value;
   }
+
+#if 1
+  /* First, reset the core */
+  value = (0xff << 16) + (0xff << 16) + (gs->s_port);
+  *((uint32_t *)(base + GO_EN_RST_PORT)) = value;
+
+  /* Next, remove core from reset state: */
+  value = (0x00 << 16) + (0xff << 16) + (gs->s_port);
+  *((uint32_t *)(base + GO_EN_RST_PORT)) = value;
+#else
+  value = 0x01010000 | (0xffff & (gs->s_port));
+  *((uint32_t *)(base + GO_EN_RST_PORT)) = value;
+#endif
 
   for(i = 0; i < GETAP_ARP_CACHE; i++){
     /* heuristic to make things less bursty ... unclear if it is worth anything */
@@ -989,6 +1033,11 @@ void destroy_getap(struct katcp_dispatch *d, struct getap_state *gs)
   if(gs->s_tap_name){
     free(gs->s_tap_name);
     gs->s_tap_name = NULL;
+  }
+
+  if (gs->s_mcast_fd > 0){
+    close(gs->s_mcast_fd);
+    gs->s_mcast_fd = (-1);
   }
 
   /* now ensure that things are invalidated */
@@ -1120,11 +1169,13 @@ struct getap_state *create_getap(struct katcp_dispatch *d, unsigned int instance
   gs->s_instance = instance;
   gs->s_iteration = 0;
   gs->s_burst = RECEIVE_BURST;
+  gs->s_deferrals = 0;
 
   gs->s_register = NULL;
 
   gs->s_tap_io = NULL;
   gs->s_tap_fd = (-1);
+  gs->s_mcast_fd = (-1);
 
   gs->s_timer = 0;
 
@@ -1346,12 +1397,15 @@ void tap_print_info(struct katcp_dispatch *d, struct getap_state *gs)
     }
   }
 
-  log_message_katcp(gs->s_dispatch, KATCP_LEVEL_INFO, NULL, "current iteration %u", gs->s_iteration);
-  log_message_katcp(gs->s_dispatch, KATCP_LEVEL_INFO, NULL, "buffers arp=%u/rx=%u/tx=%u", gs->s_arp_len, gs->s_rx_len, gs->s_tx_len);
-  log_message_katcp(gs->s_dispatch, KATCP_LEVEL_INFO, NULL, "polling interval %u", gs->s_timer);
+  log_message_katcp(gs->s_dispatch, KATCP_LEVEL_INFO, NULL, "polling interval %ums", gs->s_timer);
+  log_message_katcp(gs->s_dispatch, KATCP_LEVEL_INFO, NULL, "max reads per interval %u", gs->s_burst);
   log_message_katcp(gs->s_dispatch, KATCP_LEVEL_INFO, NULL, "address %s", gs->s_address_name);
   log_message_katcp(gs->s_dispatch, KATCP_LEVEL_INFO, NULL, "gateware port is %u", gs->s_port);
   log_message_katcp(gs->s_dispatch, KATCP_LEVEL_INFO, NULL, "tap device name %s on fd %d", gs->s_tap_name, gs->s_tap_fd);
+
+  log_message_katcp(gs->s_dispatch, KATCP_LEVEL_INFO, NULL, "current iteration %u", gs->s_iteration);
+  log_message_katcp(gs->s_dispatch, KATCP_LEVEL_INFO, NULL, "current arp spam deferrals %u", gs->s_deferrals);
+  log_message_katcp(gs->s_dispatch, KATCP_LEVEL_INFO, NULL, "current buffers arp=%u/rx=%u/tx=%u", gs->s_arp_len, gs->s_rx_len, gs->s_tx_len);
 }
 
 int tap_info_cmd(struct katcp_dispatch *d, int argc)
@@ -1389,3 +1443,197 @@ int tap_info_cmd(struct katcp_dispatch *d, int argc)
 
   return KATCP_RESULT_FAIL;
 }
+
+int tap_multicast_add_group_cmd(struct katcp_dispatch *d, int argc)
+{
+  struct tbs_raw *tr;
+  struct katcp_arb *a;
+  struct getap_state *gs;
+  char *grpip, *count, *name, *mode;
+
+  void *base    = NULL;
+  uint32_t mask = 0xFFFFFFFF;
+  int i, groups = 1;
+
+  /*recv*/
+  int reuse = 1, loopch = 0;
+  struct sockaddr_in  locosock;
+  //struct ip_mreq        grp;
+  
+  /*send*/
+  struct in_addr        locoif;
+
+  tr = get_current_mode_katcp(d);
+  if(tr == NULL){
+    log_message_katcp(d, KATCP_LEVEL_ERROR, NULL, "unable to get raw state");
+    return KATCP_RESULT_FAIL;
+  }
+
+  if (argc < 4){
+    log_message_katcp(d, KATCP_LEVEL_ERROR, NULL, "usage tap-name [recv|send] multicast-address");
+    return KATCP_RESULT_FAIL;
+  }
+  
+  name = arg_string_katcp(d, 1);
+  mode = arg_string_katcp(d, 2);
+  grpip  = arg_string_katcp(d, 3);
+
+  a = find_arb_katcp(d, name);
+  if(a == NULL){
+    log_message_katcp(d, KATCP_LEVEL_ERROR, NULL, "unable to locate %s", name);
+    return KATCP_RESULT_FAIL;
+  }
+
+  gs = data_arb_katcp(d, a);
+  if(gs == NULL){
+    log_message_katcp(d, KATCP_LEVEL_ERROR, NULL, "no user state found for %s", name);
+    return KATCP_RESULT_FAIL;
+  }
+
+  gs->s_mcast_fd = socket(AF_INET, SOCK_DGRAM, 0);
+  if (gs->s_mcast_fd < 0){
+    log_message_katcp(d, KATCP_LEVEL_ERROR, NULL, "unable to open multicast %s socket on %s", mode, name);
+    return KATCP_RESULT_FAIL;
+  }
+
+  memset((char*) &locosock, 0, sizeof(locosock));
+  locosock.sin_family       = AF_INET;
+  locosock.sin_port         = htons(gs->s_port);
+
+  if (strncmp(mode,"recv", 4) == 0){
+
+    if (setsockopt(gs->s_mcast_fd, SOL_SOCKET, SO_REUSEADDR, (char *)&reuse, sizeof(reuse)) < 0){
+      log_message_katcp(d, KATCP_LEVEL_WARN, NULL, "unable to set reuseaddr on mcast socket");
+    }
+    
+    /*change to inet_aton*/
+    //locosock.sin_addr.s_addr  = inet_addr(gs->s_address_name);
+    if(inet_aton(gs->s_address_name, (struct in_addr *) &locosock.sin_addr.s_addr) == 0){
+      log_message_katcp(d, KATCP_LEVEL_ERROR, NULL, "unable to parse %s to ip address", gs->s_address_name);
+      return -1;
+    }
+
+    if (bind(gs->s_mcast_fd, (struct sockaddr *) &locosock, sizeof(locosock)) < 0){
+      close(gs->s_mcast_fd);
+      log_message_katcp(d, KATCP_LEVEL_ERROR, NULL, "unable to bind multicast %s socket on %s (%s)", mode, name, strerror(errno));
+      return KATCP_RESULT_FAIL;
+    }
+
+
+    count = strchr(grpip, '+');
+    if (count){
+      count++;
+      groups = atoi(count);
+      count--;
+      count[0] = '\0';
+      log_message_katcp(d, KATCP_LEVEL_INFO, NULL, "assign groups %d grpip %p count %p", groups, grpip, count);
+    }
+    
+    uint32_t temp1 = ntohl(inet_addr(grpip));
+    
+    base = gs->s_raw_mode->r_map + gs->s_register->e_pos_base;
+    if (base){
+      /*assign the multicast ip to the gateware*/
+      *((uint32_t *)(base + GO_MCADDR)) = (uint32_t) htonl(temp1);
+      /*assign the multicast mast to the gateware*/
+      *((uint32_t *)(base + GO_MCMASK)) = (uint32_t) mask - (uint32_t) groups; 
+    }
+
+    for (i=0; i<groups; i++){
+
+      struct ip_mreq        grp;
+      
+      //log_message_katcp(d, KATCP_LEVEL_INFO, NULL, "temp1: 0x%08X", temp1);
+
+      grp.imr_interface.s_addr = inet_addr(gs->s_address_name);
+      grp.imr_multiaddr.s_addr = htonl(temp1); 
+      if (setsockopt(gs->s_mcast_fd, IPPROTO_IP, IP_ADD_MEMBERSHIP, (struct ip_mreq *) &grp, sizeof(struct ip_mreq)) < 0){
+        close(gs->s_mcast_fd);
+        log_message_katcp(d, KATCP_LEVEL_ERROR, NULL, "unable to add multicast membership to %s on %s (%s)", grpip, name, strerror(errno));
+        return KATCP_RESULT_FAIL;
+      }
+      
+      log_message_katcp(d, KATCP_LEVEL_INFO, NULL, "assigned group %s", inet_ntoa(grp.imr_multiaddr));
+
+      temp1++;
+    }
+    
+  } else if (strncmp(mode, "send", 4) == 0){
+    
+    if (setsockopt(gs->s_mcast_fd, IPPROTO_IP, IP_MULTICAST_LOOP, (char *) &loopch, sizeof(loopch)) < 0){
+      log_message_katcp(d, KATCP_LEVEL_ERROR, NULL, "unable to disable multicast loop back (%s)", strerror(errno));
+      close(gs->s_mcast_fd);
+      return KATCP_RESULT_FAIL;
+    }
+
+#if 0
+    /*this may be unessesary*/
+    locosock.sin_addr.s_addr = inet_addr(grpip);
+#endif
+
+    locoif.s_addr   = inet_addr(gs->s_address_name);
+    if (setsockopt(gs->s_mcast_fd, IPPROTO_IP, IP_MULTICAST_IF, (char *) &locoif, sizeof(locoif)) < 0){
+      log_message_katcp(d, KATCP_LEVEL_ERROR, NULL, "unable to set multicast back (%s)", strerror(errno));
+      close(gs->s_mcast_fd);
+      return KATCP_RESULT_FAIL;
+    }
+    
+  } else {
+    log_message_katcp(d, KATCP_LEVEL_ERROR , NULL, "invalid mode <%s> [send | recv]", mode);
+    return KATCP_RESULT_FAIL;
+  }
+  
+  return KATCP_RESULT_OK;
+} 
+
+int tap_multicast_remove_group_cmd(struct katcp_dispatch *d, int argc)
+{
+  struct tbs_raw *tr;
+  struct katcp_arb *a;
+  struct getap_state *gs;
+  char *grpip, *name;
+  
+  struct ip_mreq grp;
+
+  tr = get_current_mode_katcp(d);
+  if(tr == NULL){
+    log_message_katcp(d, KATCP_LEVEL_ERROR, NULL, "unable to get raw state");
+    return KATCP_RESULT_FAIL;
+  }
+
+  if (argc < 3){
+    log_message_katcp(d, KATCP_LEVEL_ERROR, NULL, "usage tap-name multicast-address");
+    return KATCP_RESULT_FAIL;
+  }
+  
+  name  = arg_string_katcp(d, 1);
+  grpip = arg_string_katcp(d, 2);
+  
+  a = find_arb_katcp(d, name);
+  if(a == NULL){
+    log_message_katcp(d, KATCP_LEVEL_ERROR, NULL, "unable to locate %s", name);
+    return KATCP_RESULT_FAIL;
+  }
+
+  gs = data_arb_katcp(d, a);
+  if(gs == NULL){
+    log_message_katcp(d, KATCP_LEVEL_ERROR, NULL, "no user state found for %s", name);
+    return KATCP_RESULT_FAIL;
+  }
+
+  grp.imr_multiaddr.s_addr = inet_addr(grpip);
+  grp.imr_interface.s_addr = inet_addr(gs->s_address_name);
+  if (setsockopt(gs->s_mcast_fd, IPPROTO_IP, IP_DROP_MEMBERSHIP, (char *) &grp, sizeof(grp)) < 0){
+    //close(gs->s_mcast_fd);
+    //gs->s_mcast_fd = (-1);
+    //log_message_katcp(d, KATCP_LEVEL_ERROR, NULL, "unable to drop multicast membership to %s on %s (%s)", grpip, name, strerror(errno));
+    //return KATCP_RESULT_FAIL;
+  }
+  
+  close(gs->s_mcast_fd);
+  
+  gs->s_mcast_fd = (-1);
+
+  
+  return KATCP_RESULT_OK;
+} 

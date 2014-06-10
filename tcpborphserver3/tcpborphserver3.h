@@ -69,11 +69,13 @@ struct getap_state{
   unsigned int s_instance;
   uint16_t s_iteration;
   unsigned int s_burst;
+  unsigned int s_deferrals;
 
   struct tbs_entry *s_register;
 
   struct katcp_arb *s_tap_io;
   int s_tap_fd;
+  int s_mcast_fd;
 
 #if 0
   struct timeval s_timeout;
