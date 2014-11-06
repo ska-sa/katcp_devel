@@ -22,6 +22,7 @@ int list_plugin_cmd(struct katcp_dispatch *d, int argc)
 {
   int i;
   void *module;
+  char resp_str[80];
   char *plugin_name;
   char *plugin_vers;
 
@@ -33,6 +34,14 @@ int list_plugin_cmd(struct katcp_dispatch *d, int argc)
     return KATCP_RESULT_FAIL;
   }
 
+  /* Log how many plugins are loaded */
+  log_message_katcp(d, KATCP_LEVEL_INFO, NULL, "%d plugin(s) loaded", N_LOADED_PLUGINS);
+
+  /* Initialize the response */
+  prepend_reply_katcp(d);
+  append_string_katcp(d, KATCP_FLAG_STRING, KATCP_OK);
+
+  /* Append each name/vers to the response */
   for (i=0; i<N_LOADED_PLUGINS; i++) {
     module = LOADED_PLUGINS[i];
 
@@ -41,11 +50,14 @@ int list_plugin_cmd(struct katcp_dispatch *d, int argc)
     plugin_name = plugin_info->name;
     plugin_vers = plugin_info->version;
 
-    /* Print info on each loaded module */
-    log_message_katcp(d, KATCP_LEVEL_INFO, NULL, "%s(%s)", plugin_name, plugin_vers);
+    /* Append info on each loaded module */
+    sprintf(resp_str, "%s(%s)", plugin_name, plugin_vers);
+    append_string_katcp(d, KATCP_FLAG_STRING, resp_str);
   }
 
-  return extra_response_katcp(d, KATCP_RESULT_OK, "%d plugin(s) loaded", N_LOADED_PLUGINS);
+  /* Finally append total number of plugins */
+  append_double_katcp(d, KATCP_FLAG_DOUBLE | KATCP_FLAG_LAST, N_LOADED_PLUGINS);
+  return KATCP_RESULT_OWN;
 }
 
 int load_plugin_cmd(struct katcp_dispatch *d, int argc)
