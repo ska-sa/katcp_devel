@@ -55,11 +55,12 @@ int load_plugin_cmd(struct katcp_dispatch *d, int argc)
   int n_cmds;
   char *name;
   char *error;
-  void *module;
-  char *plugin_name;
-  char *plugin_vers;
+  void *module, *i_module;
+  char *plugin_name, *i_plugin_name;
+  char *plugin_vers, *i_plugin_vers;
 
   struct PLUGIN *plugin_info;
+  struct PLUGIN *i_plugin_info;
   struct PLUGIN_CMD *plugin_cmds;
 
   int (* plugin_init)(struct katcp_dispatch *d, int argc);
@@ -101,6 +102,22 @@ int load_plugin_cmd(struct katcp_dispatch *d, int argc)
     log_message_katcp(d, KATCP_LEVEL_ERROR, NULL, "plugin version not set");
     dlclose(module); /* make sure to close on failure */
     return KATCP_RESULT_FAIL;
+  }
+
+  /* Check if we've already loaded this plugin */
+  for (i=0; i<N_LOADED_PLUGINS; i++) {
+    i_module = LOADED_PLUGINS[i];
+
+    /* Get plugin info (no error checking needed)*/
+    i_plugin_info = dlsym(i_module, "KATCP_PLUGIN");
+    i_plugin_name = i_plugin_info->name;
+    i_plugin_vers = i_plugin_info->version;
+
+    if (strcmp(plugin_name, i_plugin_name) == 0) {
+      log_message_katcp(d, KATCP_LEVEL_INFO, NULL, "%s(%s) already loaded!", i_plugin_name, i_plugin_vers);
+      dlclose(module); /* make sure to close on failure */
+      return KATCP_RESULT_FAIL;
+    }
   }
 
   /* Get the init if available */
