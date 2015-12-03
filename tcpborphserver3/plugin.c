@@ -35,7 +35,7 @@ int list_plugin_cmd(struct katcp_dispatch *d, int argc)
   }
 
   /* Log how many plugins are loaded */
-  log_message_katcp(d, KATCP_LEVEL_INFO, NULL, "%d plugin(s) loaded", N_LOADED_PLUGINS);
+  log_message_katcp(d, KATCP_LEVEL_DEBUG, NULL, "%d plugin(s) loaded", N_LOADED_PLUGINS);
 
   /* Initialize the response */
   prepend_reply_katcp(d);
@@ -126,7 +126,7 @@ int load_plugin_cmd(struct katcp_dispatch *d, int argc)
     i_plugin_vers = i_plugin_info->version;
 
     if (strcmp(plugin_name, i_plugin_name) == 0) {
-      log_message_katcp(d, KATCP_LEVEL_INFO, NULL, "%s(%s) already loaded!", i_plugin_name, i_plugin_vers);
+      log_message_katcp(d, KATCP_LEVEL_DEBUG, NULL, "%s(%s) already loaded!", i_plugin_name, i_plugin_vers);
       dlclose(module); /* make sure to close on failure */
       return KATCP_RESULT_FAIL;
     }
@@ -135,7 +135,7 @@ int load_plugin_cmd(struct katcp_dispatch *d, int argc)
   /* Get the init if available */
   plugin_init = plugin_info->init;
   if (plugin_init == NULL) {
-    log_message_katcp(d, KATCP_LEVEL_INFO, NULL, "no plugin init function found");
+    log_message_katcp(d, KATCP_LEVEL_DEBUG, NULL, "no plugin init function found");
   } else {
     /* Call init before loading commands */
     if (plugin_init(d, argc) != 0) {
@@ -148,7 +148,7 @@ int load_plugin_cmd(struct katcp_dispatch *d, int argc)
   /* Get total commands available */
   n_cmds = plugin_info->n_cmds;
   if (n_cmds == 0) {
-    log_message_katcp(d, KATCP_LEVEL_INFO, NULL, "plugin says no commands available");
+    log_message_katcp(d, KATCP_LEVEL_DEBUG, NULL, "plugin says no commands available");
   }
 
   /* Get array of functions */
@@ -160,7 +160,7 @@ int load_plugin_cmd(struct katcp_dispatch *d, int argc)
   /* Load commands into tcpborphserver */
   for (i=0; i<n_cmds; i++) {
     struct PLUGIN_CMD cmd = plugin_cmds[i];
-    log_message_katcp(d, KATCP_LEVEL_INFO, NULL, "found command: %s", cmd.name);
+    log_message_katcp(d, KATCP_LEVEL_DEBUG, NULL, "found command: %s", cmd.name);
     result = register_flag_mode_katcp(d, cmd.name, cmd.desc, cmd.cmd, 0, TBS_MODE_RAW);
     if (result) {
       log_message_katcp(d, KATCP_LEVEL_ERROR, NULL, "error loading: ", cmd.name);
@@ -225,7 +225,7 @@ int unload_plugin_cmd(struct katcp_dispatch *d, int argc)
 
     if (strcmp(name, plugin_name) == 0) {
       /* Print info on each loaded module */
-      log_message_katcp(d, KATCP_LEVEL_INFO, NULL, "found plugin %s", plugin_name);
+      log_message_katcp(d, KATCP_LEVEL_DEBUG, NULL, "found plugin %s", plugin_name);
       found = 1;
       break;
     }
