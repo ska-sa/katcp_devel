@@ -10,6 +10,7 @@ extern "C" {
 #define NETC_ASYNC           0x04
 #define NETC_TCP_KEEP_ALIVE  0x08
 #define NETC_AUTO_PORT       0x10
+#define NETC_TCP_USR_TIMEOUT 0x20
 
 #define NETC_DEFAULT_PORT    7147
 

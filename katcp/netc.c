@@ -246,6 +246,14 @@ int net_connect(char *name, int port, int flags)
 #endif
   }
 
+  if(flags & NETC_TCP_USR_TIMEOUT){
+      option = 10*1000; // unit is ms
+      if (setsockopt(fd, SOL_TCP, TCP_USER_TIMEOUT, &option, sizeof(option)) < 0){
+          fprintf(stderr, "conect: cannot set user timeout socket option\n");
+          return -1;
+      }
+  }
+
   len = sizeof(struct sockaddr_in);
 
   if(connect(fd, (struct sockaddr *)(&sa), len)){
