@@ -246,6 +246,7 @@ int net_connect(char *name, int port, int flags)
 #endif
   }
 
+#ifdef TCP_USER_TIMEOUT
   if(flags & NETC_TCP_USR_TIMEOUT){
       option = 10*1000; // unit is ms
       if (setsockopt(fd, SOL_TCP, TCP_USER_TIMEOUT, &option, sizeof(option)) < 0){
@@ -253,6 +254,7 @@ int net_connect(char *name, int port, int flags)
           return -1;
       }
   }
+#endif
 
   len = sizeof(struct sockaddr_in);
 
